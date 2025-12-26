@@ -247,3 +247,203 @@ func TestRamerDouglasPeuckerWithCustomType(t *testing.T) {
 		}
 	}
 }
+
+// Point4D is a 4-dimensional point for testing
+type Point4D struct {
+	X, Y, Z, V float64
+}
+
+func TestRamerDouglasPeucker4D(t *testing.T) {
+	// Create a 4D curve with some noise
+	points4D := []Point4D{
+		{X: 0, Y: 0, Z: 0, V: 0},
+		{X: 1, Y: 1, Z: 1, V: 1},
+		{X: 2, Y: 2.1, Z: 1.9, V: 2.05}, // Close to line
+		{X: 3, Y: 2.9, Z: 3.1, V: 2.95}, // Close to line
+		{X: 4, Y: 4, Z: 4, V: 4},
+		{X: 5, Y: 5, Z: 5, V: 5},
+		{X: 6, Y: 5.9, Z: 6.1, V: 5.95}, // Close to line
+		{X: 7, Y: 7, Z: 7, V: 7},
+		{X: 8, Y: 8, Z: 8, V: 8},
+	}
+
+	result := RamerDouglasPeucker4D(
+		points4D,
+		1.0, // epsilon
+		func(p Point4D) float64 { return p.X },
+		func(p Point4D) float64 { return p.Y },
+		func(p Point4D) float64 { return p.Z },
+		func(p Point4D) float64 { return p.V },
+		nil, nil, nil, nil,
+	)
+
+	// Should simplify to fewer points
+	if len(result) >= len(points4D) {
+		t.Errorf("Expected simplification in 4D, got %d points from %d",
+			len(result), len(points4D))
+	}
+
+	// First and last should be preserved
+	if result[0] != points4D[0] {
+		t.Error("First point should be preserved in 4D")
+	}
+	if result[len(result)-1] != points4D[len(points4D)-1] {
+		t.Error("Last point should be preserved in 4D")
+	}
+
+	t.Logf("4D Simplified from %d to %d points", len(points4D), len(result))
+}
+
+func TestRamerDouglasPeucker4DEmptySlice(t *testing.T) {
+	var empty []Point4D
+	result := RamerDouglasPeucker4D(
+		empty,
+		1.0,
+		func(p Point4D) float64 { return p.X },
+		func(p Point4D) float64 { return p.Y },
+		func(p Point4D) float64 { return p.Z },
+		func(p Point4D) float64 { return p.V },
+		nil, nil, nil, nil,
+	)
+
+	if len(result) != 0 {
+		t.Errorf("Expected empty slice, got %d points", len(result))
+	}
+}
+
+func TestRamerDouglasPeucker4DTwoPoints(t *testing.T) {
+	two := []Point4D{{1, 2, 3, 4}, {5, 6, 7, 8}}
+	result := RamerDouglasPeucker4D(
+		two,
+		1.0,
+		func(p Point4D) float64 { return p.X },
+		func(p Point4D) float64 { return p.Y },
+		func(p Point4D) float64 { return p.Z },
+		func(p Point4D) float64 { return p.V },
+		nil, nil, nil, nil,
+	)
+
+	if len(result) != 2 {
+		t.Errorf("Expected 2 points, got %d", len(result))
+	}
+}
+
+func TestRamerDouglasPeucker4DWithTransformers(t *testing.T) {
+	points4D := []Point4D{
+		{X: 0, Y: 0, Z: 0, V: 0},
+		{X: 1, Y: 1, Z: 1, V: 1},
+		{X: 2, Y: 0.1, Z: 0.1, V: 0.1},
+		{X: 3, Y: 3, Z: 3, V: 3},
+	}
+
+	result := RamerDouglasPeucker4D(
+		points4D,
+		2.0,
+		func(p Point4D) float64 { return p.X },
+		func(p Point4D) float64 { return p.Y },
+		func(p Point4D) float64 { return p.Z },
+		func(p Point4D) float64 { return p.V },
+		func(x float64) float64 { return x * 10 }, // scale by 10
+		func(y float64) float64 { return y * 10 },
+		func(z float64) float64 { return z * 10 },
+		func(v float64) float64 { return v * 10 },
+	)
+
+	// Should still return original points, not transformed ones
+	for _, p := range result {
+		found := false
+		for _, orig := range points4D {
+			if p == orig {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Result contains point not in original: %v", p)
+		}
+	}
+}
+
+// Test with custom 4D struct to verify generics work
+type SpaceTimePoint struct {
+	X, Y, Z     float64 // Spatial coordinates
+	Time        float64 // Time dimension
+	Temperature float64 // Additional data
+	Label       string  // Metadata
+}
+
+func TestRamerDouglasPeucker4DWithCustomType(t *testing.T) {
+	trajectory := []SpaceTimePoint{
+		{X: 0, Y: 0, Z: 0, Time: 0, Temperature: 20, Label: "start"},
+		{X: 1, Y: 1, Z: 1, Time: 1, Temperature: 21, Label: "p1"},
+		{X: 2, Y: 2.05, Z: 1.95, Time: 2, Temperature: 22, Label: "p2"},
+		{X: 3, Y: 2.95, Z: 3.05, Time: 3, Temperature: 23, Label: "p3"},
+		{X: 4, Y: 4, Z: 4, Time: 4, Temperature: 24, Label: "p4"},
+		{X: 5, Y: 5, Z: 5, Time: 5, Temperature: 25, Label: "end"},
+	}
+
+	result := RamerDouglasPeucker4D(
+		trajectory,
+		0.5,
+		func(p SpaceTimePoint) float64 { return p.X },
+		func(p SpaceTimePoint) float64 { return p.Y },
+		func(p SpaceTimePoint) float64 { return p.Z },
+		func(p SpaceTimePoint) float64 { return p.Time },
+		nil, nil, nil, nil,
+	)
+
+	// Should simplify
+	if len(result) >= len(trajectory) {
+		t.Errorf("Expected simplification, got %d points from %d",
+			len(result), len(trajectory))
+	}
+
+	// First and last preserved
+	if result[0] != trajectory[0] {
+		t.Error("First point should be preserved")
+	}
+	if result[len(result)-1] != trajectory[len(trajectory)-1] {
+		t.Error("Last point should be preserved")
+	}
+
+	// Verify all metadata is preserved
+	for _, p := range result {
+		if p.Temperature < 20 || p.Temperature > 25 {
+			t.Errorf("Temperature out of range: %f", p.Temperature)
+		}
+		if p.Label == "" {
+			t.Error("Label should be preserved")
+		}
+	}
+
+	t.Logf("Simplified space-time trajectory from %d to %d points",
+		len(trajectory), len(result))
+}
+
+// Benchmark 4D performance
+func BenchmarkRamerDouglasPeucker4D(b *testing.B) {
+	// Generate a 4D dataset
+	points4D := make([]Point4D, 100)
+	for i := range points4D {
+		x := float64(i)
+		points4D[i] = Point4D{
+			X: x,
+			Y: x + math.Sin(x*0.1)*5,
+			Z: x + math.Cos(x*0.1)*5,
+			V: x + math.Sin(x*0.2)*3,
+		}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		RamerDouglasPeucker4D(
+			points4D,
+			25.0,
+			func(p Point4D) float64 { return p.X },
+			func(p Point4D) float64 { return p.Y },
+			func(p Point4D) float64 { return p.Z },
+			func(p Point4D) float64 { return p.V },
+			nil, nil, nil, nil,
+		)
+	}
+}

@@ -73,9 +73,20 @@ the Go function.
 
 Benchmark results on AMD Ryzen 7 PRO 7840U:
 
+**2D RDP:**
+
 - ~31,910 ns/op (0.032ms) for 101-point dataset
 - 4,080 bytes allocated
 - 8 allocations per operation
+
+**4D RDP:**
+
+- ~37,069 ns/op (0.037ms) for 100-point dataset
+- 4,800 bytes allocated
+- 4 allocations per operation
+
+The 4D version adds only ~16% overhead compared to 2D, making it very efficient
+for multi-dimensional simplification.
 
 ## Testing
 
@@ -89,13 +100,40 @@ variance (2 out of 33 points) is due to:
 
 All functional tests pass, demonstrating correct behavior.
 
-## Future Enhancements
+## 4-Dimensional Support
 
-The implementation is ready for 3D extension by:
+### Implementation
 
-1. Adding `zExtractor` and `zTransformer` parameters
-2. Modifying distance calculation to include Z coordinate
-3. All other logic remains the same
+The library includes `RamerDouglasPeucker4D` which extends the algorithm to 4
+dimensions:
+
+- Added `zExtractor` and `vExtractor` parameters for the 3rd and 4th dimensions
+- Added `zTransformer` and `vTransformer` optional transformers
+- Modified distance calculation: `dx² + dy² + dz² + dv²`
+- Separate implementation to maintain backward compatibility and performance
+
+### Distance Calculation in 4D
+
+The perpendicular distance from a point to a line segment in 4D space uses the
+standard formula:
+
+```
+d² = dx² + dy² + dz² + dv²
+```
+
+Where the projection parameter `t` is calculated as:
+
+```
+t = ((p.x - p1.x) * dx + (p.y - p1.y) * dy + (p.z - p1.z) * dz + (p.v - p1.v) * dv) / 
+    (dx² + dy² + dz² + dv²)
+```
+
+### Use Cases for 4D
+
+- **Space-time trajectories**: GPS tracks where (x,y,z) = position and v = time
+- **Animation paths**: 3D movement with temporal component
+- **Multi-sensor data**: Temperature, pressure, humidity, time
+- **Scientific simulations**: Any 4-variable system
 
 ## Files
 

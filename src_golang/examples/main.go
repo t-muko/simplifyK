@@ -100,4 +100,44 @@ func main() {
 	fmt.Printf("Original GPS track: %d points\n", len(gpsTrack))
 	fmt.Printf("Simplified GPS track: %d points\n", len(simplifiedGPS))
 	fmt.Println("All metadata (timestamp, elevation) preserved in simplified points!")
+
+	// Example with 4D simplification
+	fmt.Println("\n--- Example with 4D space-time trajectory ---")
+
+	type SpaceTimePoint struct {
+		X, Y, Z     float64 // Spatial coordinates
+		Time        float64 // Time dimension
+		Temperature float64 // Additional metadata
+	}
+
+	trajectory := []SpaceTimePoint{
+		{X: 0, Y: 0, Z: 0, Time: 0, Temperature: 20},
+		{X: 1, Y: 1, Z: 1, Time: 1, Temperature: 21},
+		{X: 2, Y: 2.05, Z: 1.95, Time: 2, Temperature: 22},
+		{X: 3, Y: 2.95, Z: 3.05, Time: 3, Temperature: 23},
+		{X: 4, Y: 4, Z: 4, Time: 4, Temperature: 24},
+		{X: 5, Y: 5, Z: 5, Time: 5, Temperature: 25},
+		{X: 6, Y: 5.9, Z: 6.1, Time: 6, Temperature: 26},
+		{X: 7, Y: 7, Z: 7, Time: 7, Temperature: 27},
+		{X: 8, Y: 8, Z: 8, Time: 8, Temperature: 28},
+	}
+
+	simplified4D := simplifyk.RamerDouglasPeucker4D(
+		trajectory,
+		1.0, // epsilon
+		func(p SpaceTimePoint) float64 { return p.X },
+		func(p SpaceTimePoint) float64 { return p.Y },
+		func(p SpaceTimePoint) float64 { return p.Z },
+		func(p SpaceTimePoint) float64 { return p.Time },
+		nil, nil, nil, nil, // no transformers
+	)
+
+	fmt.Printf("Original 4D trajectory: %d points\n", len(trajectory))
+	fmt.Printf("Simplified 4D trajectory: %d points\n", len(simplified4D))
+	fmt.Println("Simplified points:")
+	for i, p := range simplified4D {
+		fmt.Printf("  %d: Position(%.1f, %.1f, %.1f) Time=%.1f Temp=%.1f°C\n",
+			i, p.X, p.Y, p.Z, p.Time, p.Temperature)
+	}
+	fmt.Println("All metadata (Temperature) preserved!")
 }

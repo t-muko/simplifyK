@@ -11,7 +11,7 @@ package main
 
 import (
     "fmt"
-    "github.com/jamesyox/simplifyk"
+    "github.com/t-muko/simplifyk/src_golang"
 )
 
 type Point struct {

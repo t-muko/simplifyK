@@ -345,9 +345,9 @@ Potential future additions:
 ## Related Files
 
 - **Implementation**:
-  `src/commonMain/kotlin/dev/jamesyox/simplifyk/simplifications/RamerDouglasPeucker.kt`
+  `src/commonMain/kotlin/dev/t-muko/simplifyk/src_golang/simplifications/RamerDouglasPeucker.kt`
 - **Tests**:
-  `src/commonTest/kotlin/dev/jamesyox/simplifyk/RamerDouglasPeucker3DTest.kt`
+  `src/commonTest/kotlin/dev/t-muko/simplifyk/src_golang/RamerDouglasPeucker3DTest.kt`
 - **Documentation**: `README.md`
 
 ## Migration Guide

@@ -51,6 +51,52 @@ var expectedSimplified = []Point2D{
 	{866.36, 480.77},
 }
 
+var points2 = []Point2D{
+	{0, 0}, {10, 5.5}, {20, 0},
+}
+
+var points2e = []Point2D{
+	{0, 0}, {20, 0},
+}
+var points3 = []Point2D{
+	{30, 0}, {40, 0}, {50, 0}, {60, 4.5}, {80, 0},
+}
+
+var points3e = []Point2D{
+	{30, 0}, {40, 0}, {50, 0}, {60, 4.5}, {80, 0},
+}	
+
+func TestRamerDouglasPeuckerEpsilonScale(t *testing.T) {
+	
+	result := RamerDouglasPeucker(
+		points2,
+		5.0,
+		func(p Point2D) float64 { return p.X },
+		func(p Point2D) float64 { return p.Y },
+		nil, // no x transformer
+		nil, // no y transformer
+	)
+
+	// Should have fewer points than input
+	if len(result) >= len(points2e) {
+		t.Errorf("Expected simplification, got %d points from %d", len(result), len(points2e))
+	}
+
+	result3 := RamerDouglasPeucker(
+		points3,
+		5.0,
+		func(p Point2D) float64 { return p.X },
+		func(p Point2D) float64 { return p.Y },
+		nil, // no x transformer
+		nil, // no y transformer
+	)
+
+	// Should have same points than input
+	if len(result) != len(points3e) {
+		t.Errorf("Expected simplification, got %d points from %d", len(result), len(points3e))
+	}	
+}
+
 func TestRamerDouglasPeucker(t *testing.T) {
 	// Note: This test uses the expected output from simplify-js, which applies
 	// Radial Distance preprocessing before RDP. Our Go implementation matches

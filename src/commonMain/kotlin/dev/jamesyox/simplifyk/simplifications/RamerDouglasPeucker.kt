@@ -9,7 +9,7 @@ import dev.jamesyox.simplifyk.simplifications.util.coord
  * @receiver A list of any data type that you wish to apply the Ramer-Douglas-Peucker algorithm to.
  *
  * @param T The type of the data points you wish to simplify
- * @param epsilon The epsilon in the RDP algorithm
+ * @param epsilon The epsilon in the RDP algorithm in the same units as xyz
  * @param xExtractor A function that given an input T can extract the x value
  * @param yExtractor A function that given an input T can extract the y value
  * @param xTransformer Optional function that transforms the x value sent to the simplification algorithms
@@ -65,7 +65,7 @@ internal inline fun <T> getSimplifyDpStep(
     crossinline yTransformer: (Double) -> Double,
 ): DeepRecursiveFunction<DpStepParams<T>, Unit> {
     return DeepRecursiveFunction { params ->
-        var dmax = epsilon
+        var dmax = 0.0 // initialize to zero in order to recurse 3 point lists correctly
         var index = 0
 
         for (i in (params.firstIndex + 1) until params.lastIndex) {
@@ -83,7 +83,8 @@ internal inline fun <T> getSimplifyDpStep(
                 dmax = sqDist
             }
         }
-        if (dmax > epsilon) {
+        if (dmax > epsilon * epsilon) { // the real epsilon is on the same units as x and y. 
+            // The comparison uses squared values
             if ((index - params.firstIndex) > 1) {
                 callRecursive(
                     DpStepParams(params.points, params.firstIndex, index, epsilon, params.simplified)
@@ -141,7 +142,7 @@ internal inline fun <T>getSquareSegDistance(
  * @receiver A list of any data type that you wish to apply the Ramer-Douglas-Peucker algorithm to.
  *
  * @param T The type of the data points you wish to simplify
- * @param epsilon The epsilon in the RDP algorithm
+ * @param epsilon The epsilon in the RDP algorithm in the same units as x, y and z.
  * @param xExtractor A function that given an input T can extract the x value
  * @param yExtractor A function that given an input T can extract the y value
  * @param zExtractor A function that given an input T can extract the z value
@@ -199,7 +200,7 @@ internal inline fun <T> getSimplifyDpStep3D(
     crossinline zTransformer: (Double) -> Double,
 ): DeepRecursiveFunction<DpStepParams<T>, Unit> {
     return DeepRecursiveFunction { params ->
-        var dmax = epsilon
+        var dmax = 0.0 // initialize to zero in order to recurse 3 point lists correctly
         var index = 0
 
         for (i in (params.firstIndex + 1) until params.lastIndex) {
@@ -219,7 +220,7 @@ internal inline fun <T> getSimplifyDpStep3D(
                 dmax = sqDist
             }
         }
-        if (dmax > epsilon) {
+        if (dmax > epsilon * epsilon) { // The comparison uses squared values
             if ((index - params.firstIndex) > 1) {
                 callRecursive(
                     DpStepParams(params.points, params.firstIndex, index, epsilon, params.simplified)

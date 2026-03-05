@@ -73,7 +73,7 @@ func simplifyDPStep[T any](
 	xTransformer Transformer,
 	yTransformer Transformer,
 ) {
-	dmax := epsilon
+	dmax := 0.0
 	index := 0
 
 	for i := firstIndex + 1; i < lastIndex; i++ {
@@ -92,7 +92,7 @@ func simplifyDPStep[T any](
 		}
 	}
 
-	if dmax > epsilon {
+	if dmax > (epsilon * epsilon) {
 		if index-firstIndex > 1 {
 			simplifyDPStep(
 				points,
@@ -253,7 +253,7 @@ func simplifyDPStep4D[T any](
 	zTransformer Transformer,
 	vTransformer Transformer,
 ) {
-	dmax := epsilon
+	dmax := 0.0
 	index := 0
 
 	for i := firstIndex + 1; i < lastIndex; i++ {
@@ -276,7 +276,7 @@ func simplifyDPStep4D[T any](
 		}
 	}
 
-	if dmax > epsilon {
+	if dmax > (epsilon * epsilon) {
 		if index-firstIndex > 1 {
 			simplifyDPStep4D(
 				points,

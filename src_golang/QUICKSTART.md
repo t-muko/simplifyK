@@ -151,17 +151,7 @@ simplified := simplifyk.RamerDouglasPeucker4D(
 ## Understanding Epsilon vs Tolerance
 
 The RDP algorithm uses `epsilon` as the maximum perpendicular distance. In
-simplify-js and SimplifyK:
-
-- **tolerance** = User-friendly parameter
-- **epsilon** = tolerance² (used internally)
-
-So if you want a tolerance of 5:
-
-```go
-tolerance := 5.0
-epsilon := tolerance * tolerance  // 25.0
-```
+simplify-js it was squared, but in this implementation epsilon is linear distance.
 
 ## Running the Examples
 

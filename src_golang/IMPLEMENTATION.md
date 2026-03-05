@@ -54,14 +54,14 @@ calls.
 ### Epsilon vs Tolerance
 
 Important: In the original simplify-js and SimplifyK libraries, the `tolerance`
-parameter is **squared** before being used as `epsilon` in the RDP algorithm:
+parameter **was squared** before being used as `epsilon` in the RDP algorithm:
 
 ```
 epsilon = tolerance * tolerance
 ```
 
-This means if you want a tolerance of 5.0, you should pass `epsilon = 25.0` to
-the Go function.
+This has been now corrected to align with standard RDP aalgorithn implementation
+so epsilon is now **in the same units** as coordinates.
 
 ### Point Preservation
 

@@ -1,6 +1,7 @@
 package dev.jamesyox.simplifyk.simplifications
 
 import dev.jamesyox.simplifyk.simplifications.util.coord
+import kotlin.math.max
 
 /**
  * Takes a list of objects representing a polyline with a xExtractor and yExtractor functions and applies
@@ -34,6 +35,66 @@ public inline fun <T>List<T>.ramerDouglasPeucker(
         yExtractor = yExtractor,
         xTransformer = xTransformer,
         yTransformer = yTransformer
+    ).invoke(
+        DpStepParams(
+            points = this,
+            firstIndex = 0,
+            lastIndex = lastIndex,
+            epsilon = epsilon,
+            simplified = simplified
+        )
+    )
+    simplified.add(last())
+    return simplified.toList()
+}
+
+/**
+ * Takes a list of objects representing a polyline with xExtractor and yExtractor functions and applies
+ * the Ramer-Douglas-Peucker (RDP) algorithm using a per-point weight to scale each candidate point's
+ * perpendicular distance to the segment.
+ *
+ * Larger weights reduce the effective distance and make points less likely to be preserved.
+ * This is useful for GPS tracks where points with weaker accuracy should influence simplification less.
+ *
+ * @receiver A list of any data type that you wish to apply the weighted RDP algorithm to.
+ *
+ * @param T The type of the data points you wish to simplify
+ * @param epsilon The epsilon in the weighted RDP algorithm
+ * @param xExtractor A function that given an input T can extract the x value
+ * @param yExtractor A function that given an input T can extract the y value
+ * @param weightExtractor A function that given an input T can extract the weight value
+ * @param minWeight Minimum allowed weight value used to avoid divide-by-zero and negative values
+ * @param xTransformer Optional function that transforms the x value sent to the simplification algorithms
+ *                      but not what is returned by the simplification.
+ * @param yTransformer Optional function that transforms the y value sent to the simplification algorithms
+ *                      but not what is returned by the simplification.
+ * @param weightTransformer Optional function that transforms the extracted weight before applying it.
+ *
+ * @return A List<T> which represents the receiver with the weighted RDP algorithm applied
+ */
+@Suppress("LongParameterList")
+public inline fun <T>List<T>.ramerDouglasPeuckerWeighted(
+    epsilon: Double,
+    crossinline xExtractor: (T) -> Double,
+    crossinline yExtractor: (T) -> Double,
+    crossinline weightExtractor: (T) -> Double,
+    minWeight: Double = 1e-12,
+    crossinline xTransformer: (Double) -> Double = { it },
+    crossinline yTransformer: (Double) -> Double = { it },
+    crossinline weightTransformer: (Double) -> Double = { it }
+): List<T> {
+    require(minWeight > 0.0) { "minWeight must be greater than zero" }
+    if (size <= 2) return this
+    val simplified = mutableListOf(first())
+    getSimplifyDpStepWeighted(
+        epsilon = epsilon,
+        xExtractor = xExtractor,
+        yExtractor = yExtractor,
+        weightExtractor = weightExtractor,
+        minWeight = minWeight,
+        xTransformer = xTransformer,
+        yTransformer = yTransformer,
+        weightTransformer = weightTransformer
     ).invoke(
         DpStepParams(
             points = this,
@@ -102,6 +163,56 @@ internal inline fun <T> getSimplifyDpStep(
 
 @PublishedApi
 @Suppress("LongParameterList")
+internal inline fun <T> getSimplifyDpStepWeighted(
+    epsilon: Double,
+    crossinline xExtractor: (T) -> Double,
+    crossinline yExtractor: (T) -> Double,
+    crossinline weightExtractor: (T) -> Double,
+    minWeight: Double,
+    crossinline xTransformer: (Double) -> Double,
+    crossinline yTransformer: (Double) -> Double,
+    crossinline weightTransformer: (Double) -> Double,
+): DeepRecursiveFunction<DpStepParams<T>, Unit> {
+    return DeepRecursiveFunction { params ->
+        var dmax = 0.0 // initialize to zero in order to recurse 3 point lists correctly
+        var index = 0
+
+        for (i in (params.firstIndex + 1) until params.lastIndex) {
+            val sqDist = getWeightedSquareSegDistance(
+                p = params.points[i],
+                p1 = params.points[params.firstIndex],
+                p2 = params.points[params.lastIndex],
+                xExtractor = xExtractor,
+                yExtractor = yExtractor,
+                weightExtractor = weightExtractor,
+                minWeight = minWeight,
+                xTransformer = xTransformer,
+                yTransformer = yTransformer,
+                weightTransformer = weightTransformer
+            )
+            if (sqDist > dmax) {
+                index = i
+                dmax = sqDist
+            }
+        }
+        if (dmax > epsilon * epsilon) {
+            if ((index - params.firstIndex) > 1) {
+                callRecursive(
+                    DpStepParams(params.points, params.firstIndex, index, epsilon, params.simplified)
+                )
+            }
+            params.simplified.add(params.points[index])
+            if ((params.lastIndex - index) > 1) {
+                callRecursive(
+                    DpStepParams(params.points, index, params.lastIndex, epsilon, params.simplified)
+                )
+            }
+        }
+    }
+}
+
+@PublishedApi
+@Suppress("LongParameterList")
 internal inline fun <T>getSquareSegDistance(
     p: T,
     p1: T,
@@ -133,6 +244,33 @@ internal inline fun <T>getSquareSegDistance(
     dy = p.coord(yExtractor, yTransformer) - y
 
     return dx * dx + dy * dy
+}
+
+@PublishedApi
+@Suppress("LongParameterList")
+internal inline fun <T>getWeightedSquareSegDistance(
+    p: T,
+    p1: T,
+    p2: T,
+    crossinline xExtractor: (T) -> Double,
+    crossinline yExtractor: (T) -> Double,
+    crossinline weightExtractor: (T) -> Double,
+    minWeight: Double,
+    crossinline xTransformer: (Double) -> Double,
+    crossinline yTransformer: (Double) -> Double,
+    crossinline weightTransformer: (Double) -> Double,
+): Double {
+    val sqDist = getSquareSegDistance(
+        p = p,
+        p1 = p1,
+        p2 = p2,
+        xExtractor = xExtractor,
+        yExtractor = yExtractor,
+        xTransformer = xTransformer,
+        yTransformer = yTransformer
+    )
+    val weight = max(minWeight, weightTransformer(weightExtractor(p)))
+    return sqDist / weight
 }
 
 /**
@@ -175,6 +313,73 @@ public inline fun <T>List<T>.ramerDouglasPeucker3D(
         xTransformer = xTransformer,
         yTransformer = yTransformer,
         zTransformer = zTransformer
+    ).invoke(
+        DpStepParams(
+            points = this,
+            firstIndex = 0,
+            lastIndex = lastIndex,
+            epsilon = epsilon,
+            simplified = simplified
+        )
+    )
+    simplified.add(last())
+    return simplified.toList()
+}
+
+/**
+ * Takes a list of objects representing a 3D polyline and applies the Ramer-Douglas-Peucker (RDP)
+ * algorithm using a per-point weight to scale each candidate point's perpendicular distance to the
+ * 3D segment.
+ *
+ * Larger weights reduce the effective distance and make points less likely to be preserved.
+ * This is useful for GPS tracks where points with weaker accuracy should influence simplification less.
+ *
+ * @receiver A list of any data type that you wish to apply the weighted RDP algorithm to.
+ *
+ * @param T The type of the data points you wish to simplify
+ * @param epsilon The epsilon in the weighted RDP algorithm in the same units as x, y and z.
+ * @param xExtractor A function that given an input T can extract the x value
+ * @param yExtractor A function that given an input T can extract the y value
+ * @param zExtractor A function that given an input T can extract the z value
+ * @param weightExtractor A function that given an input T can extract the weight value
+ * @param minWeight Minimum allowed weight value used to avoid divide-by-zero and negative values
+ * @param xTransformer Optional function that transforms the x value sent to the simplification algorithms
+ *                      but not what is returned by the simplification.
+ * @param yTransformer Optional function that transforms the y value sent to the simplification algorithms
+ *                      but not what is returned by the simplification.
+ * @param zTransformer Optional function that transforms the z value sent to the simplification algorithms
+ *                      but not what is returned by the simplification.
+ * @param weightTransformer Optional function that transforms the extracted weight before applying it.
+ *
+ * @return A List<T> which represents the receiver with the weighted RDP algorithm applied in 3D space
+ */
+@Suppress("LongParameterList")
+public inline fun <T>List<T>.ramerDouglasPeuckerWeighted3D(
+    epsilon: Double,
+    crossinline xExtractor: (T) -> Double,
+    crossinline yExtractor: (T) -> Double,
+    crossinline zExtractor: (T) -> Double,
+    crossinline weightExtractor: (T) -> Double,
+    minWeight: Double = 1e-12,
+    crossinline xTransformer: (Double) -> Double = { it },
+    crossinline yTransformer: (Double) -> Double = { it },
+    crossinline zTransformer: (Double) -> Double = { it },
+    crossinline weightTransformer: (Double) -> Double = { it }
+): List<T> {
+    require(minWeight > 0.0) { "minWeight must be greater than zero" }
+    if (size <= 2) return this
+    val simplified = mutableListOf(first())
+    getSimplifyDpStepWeighted3D(
+        epsilon = epsilon,
+        xExtractor = xExtractor,
+        yExtractor = yExtractor,
+        zExtractor = zExtractor,
+        weightExtractor = weightExtractor,
+        minWeight = minWeight,
+        xTransformer = xTransformer,
+        yTransformer = yTransformer,
+        zTransformer = zTransformer,
+        weightTransformer = weightTransformer
     ).invoke(
         DpStepParams(
             points = this,
@@ -238,6 +443,60 @@ internal inline fun <T> getSimplifyDpStep3D(
 
 @PublishedApi
 @Suppress("LongParameterList")
+internal inline fun <T> getSimplifyDpStepWeighted3D(
+    epsilon: Double,
+    crossinline xExtractor: (T) -> Double,
+    crossinline yExtractor: (T) -> Double,
+    crossinline zExtractor: (T) -> Double,
+    crossinline weightExtractor: (T) -> Double,
+    minWeight: Double,
+    crossinline xTransformer: (Double) -> Double,
+    crossinline yTransformer: (Double) -> Double,
+    crossinline zTransformer: (Double) -> Double,
+    crossinline weightTransformer: (Double) -> Double,
+): DeepRecursiveFunction<DpStepParams<T>, Unit> {
+    return DeepRecursiveFunction { params ->
+        var dmax = 0.0 // initialize to zero in order to recurse 3 point lists correctly
+        var index = 0
+
+        for (i in (params.firstIndex + 1) until params.lastIndex) {
+            val sqDist = getWeightedSquareSegDistance3D(
+                p = params.points[i],
+                p1 = params.points[params.firstIndex],
+                p2 = params.points[params.lastIndex],
+                xExtractor = xExtractor,
+                yExtractor = yExtractor,
+                zExtractor = zExtractor,
+                weightExtractor = weightExtractor,
+                minWeight = minWeight,
+                xTransformer = xTransformer,
+                yTransformer = yTransformer,
+                zTransformer = zTransformer,
+                weightTransformer = weightTransformer
+            )
+            if (sqDist > dmax) {
+                index = i
+                dmax = sqDist
+            }
+        }
+        if (dmax > epsilon * epsilon) {
+            if ((index - params.firstIndex) > 1) {
+                callRecursive(
+                    DpStepParams(params.points, params.firstIndex, index, epsilon, params.simplified)
+                )
+            }
+            params.simplified.add(params.points[index])
+            if ((params.lastIndex - index) > 1) {
+                callRecursive(
+                    DpStepParams(params.points, index, params.lastIndex, epsilon, params.simplified)
+                )
+            }
+        }
+    }
+}
+
+@PublishedApi
+@Suppress("LongParameterList")
 internal inline fun <T>getSquareSegDistance3D(
     p: T,
     p1: T,
@@ -278,5 +537,36 @@ internal inline fun <T>getSquareSegDistance3D(
     dz = p.coord(zExtractor, zTransformer) - z
 
     return dx * dx + dy * dy + dz * dz
+}
+
+@PublishedApi
+@Suppress("LongParameterList")
+internal inline fun <T>getWeightedSquareSegDistance3D(
+    p: T,
+    p1: T,
+    p2: T,
+    crossinline xExtractor: (T) -> Double,
+    crossinline yExtractor: (T) -> Double,
+    crossinline zExtractor: (T) -> Double,
+    crossinline weightExtractor: (T) -> Double,
+    minWeight: Double,
+    crossinline xTransformer: (Double) -> Double,
+    crossinline yTransformer: (Double) -> Double,
+    crossinline zTransformer: (Double) -> Double,
+    crossinline weightTransformer: (Double) -> Double,
+): Double {
+    val sqDist = getSquareSegDistance3D(
+        p = p,
+        p1 = p1,
+        p2 = p2,
+        xExtractor = xExtractor,
+        yExtractor = yExtractor,
+        zExtractor = zExtractor,
+        xTransformer = xTransformer,
+        yTransformer = yTransformer,
+        zTransformer = zTransformer
+    )
+    val weight = max(minWeight, weightTransformer(weightExtractor(p)))
+    return sqDist / weight
 }
 

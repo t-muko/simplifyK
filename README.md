@@ -113,6 +113,45 @@ val simplified3D = trajectory.ramerDouglasPeucker3D(
 )
 ```
 
+## Weighted RDP (GPS accuracy aware)
+
+When point quality varies (for example GPS accuracy in meters), you can use
+weighted RDP so low-confidence points influence simplification less.
+
+SimplifyK provides:
+
+- `ramerDouglasPeuckerWeighted(...)` for 2D
+- `ramerDouglasPeuckerWeighted3D(...)` for 3D
+- `softExponentClampedWeight(...)` helper to convert accuracy values into stable
+  weights
+
+```kotlin
+data class GpsPoint(
+    val x: Double,
+    val y: Double,
+    val accuracyMeters: Double
+)
+
+val simplified = points.ramerDouglasPeuckerWeighted(
+    epsilon = 5.0,
+    xExtractor = { it.x },
+    yExtractor = { it.y },
+    weightExtractor = {
+        softExponentClampedWeight(
+            accuracyMeters = it.accuracyMeters,
+            referenceAccuracyMeters = 8.0,
+            exponent = 0.5,
+            minWeight = 0.7,
+            maxWeight = 2.0
+        )
+    }
+)
+```
+
+For meters-based GPS tracks, a practical starting point is to discard very poor
+fixes first (for example, accuracy > 30m), then apply weighted RDP with the
+defaults above.
+
 ## Value transformation
 
 A common use case of polyline simplification is to simplify the number of points
